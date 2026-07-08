@@ -1,26 +1,26 @@
 import json
 import time
+import os
 from playwright.sync_api import sync_playwright
 
-# Вставь сюда свою ссылку на телепрограмму, если она есть
-EPG_URL = "https://iptvx.one/EPG_NOARCH"
+EPG_URL = "https://example.com/epg.xml.gz"
 
 def get_m3u8_with_click(url):
     m3u8_link = None
     
     with sync_playwright() as p:
-        # Запускаем браузер с эмуляцией реального компьютера
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            viewport={"width": 1280, "height": 720}
         )
         page = context.new_page()
         
-        # Перехватчик запросов
         def handle_request(request):
             nonlocal m3u8_link
             req_url = request.url
-            if ".m3u8" in req_url or ".mpd" in req_url or "master.txt" in req_url:
+            # Ловим вообще любые упоминания m3u8 или потоков
+            if ".m3u8" in req_url or "playlist" in req_url or "stream" in req_url:
                 if "google" not in req_url and "yandex" not in req_url and "doubleclick" not in req_url:
                     m3u8_link = req_url
 
@@ -28,62 +28,65 @@ def get_m3u8_with_click(url):
         
         try:
             print(f"Открываем страницу: {url}")
-            page.goto(url, wait_until="networkidle", timeout=40000)
-            time.sleep(5) # Ждем первичную загрузку скриптов плеера
+            page.goto(url, wait_until="load", timeout=40000)
+            time.sleep(5)
             
-            # Скроллим к плееру, чтобы он попал в зону видимости (некоторые плееры не запустятся без этого)
-            if page.locator("video").is_visible():
-                page.locator("video").scroll_into_view_if_needed()
-                time.sleep(1)
+            # Делаем первый клик по центру страницы, чтобы активировать окно
+            page.mouse.click(640, 360)
+            print("Сделали клик по центру экрана")
+            time.sleep(3)
+            
+            # Пробуем кликнуть по кнопке "Плеер 1" если она есть
+            if page.locator("text=Плеер 1").is_visible():
+                page.locator("text=Плеер 1").click()
+                print("Нажали на вкладку Плеер 1")
+                time.sleep(2)
+
+            # Перебираем все возможные элементы плеера для клика
+            for selector in ["video", "object", "embed", ".play-btn", "[class*='player']"]:
+                if page.locator(selector).first.is_visible():
+                    page.locator(selector).first.click()
+                    print(f"Кликнули по селектору плеера: {selector}")
+                    time.sleep(2)
+
+            time.sleep(10)
+            
+            # Если ссылку так и не нашли — делаем скриншот для истории
+            if not m3u8_link:
+                print("Ссылка не найдена, сохраняем скриншот страницы...")
+                page.screenshot(path="error_screen.png")
                 
-                # Пробуем кликнуть по самому видео
-                page.locator("video").click()
-                print("Кликнули по тегу video")
-            
-            # Дополнительно кликаем по координатам, где на smotrettv обычно кнопка
-            page.mouse.click(450, 350)
-            print("Сделали контрольный клик по центру")
-            
-            # Ждем 12 секунд, пока поток точно раскочегарится
-            time.sleep(12)
-            
         except Exception as e:
-            print(f"Ошибка при работе с браузером: {e}")
+            print(f"Ошибка в браузере: {e}")
         finally:
             browser.close()
             
     return m3u8_link
 
 def main():
-    try:
-        with open('channels.json', 'r', encoding='utf-8') as f:
-            channels = json.load(f)
-    except Exception as e:
-        print(f"Не удалось прочитать channels.json: {e}")
-        return
+    with open('channels.json', 'r', encoding='utf-8') as f:
+        channels = json.load(f)
         
     playlist = f'#EXTM3U x-tvg-url="{EPG_URL}"\n\n'
     links_found = 0
     
     for ch in channels:
-        print(f"\n--- Обработка канала: {ch['name']} ---")
+        print(f"\n--- Тест канала: {ch['name']} ---")
         live_link = get_m3u8_with_click(ch['source_url'])
         
         if live_link:
-            print(f"УСПЕХ! Ссылка поймана: {live_link[:80]}...")
+            print(f"УСПЕХ! Ссылка: {live_link[:60]}...")
             playlist += f'#EXTINF:-1 tvg-id="{ch["tvg_id"]}" tvg-logo="{ch["logo"]}",{ch["name"]}\n'
             playlist += f'{live_link}\n\n'
             links_found += 1
-        else:
-            print(f"ОШИБКА: Не удалось поймать ссылку для {ch['name']}")
             
-    # Записываем файл только если нашли хотя бы одну рабочую ссылку
     if links_found > 0:
         with open('playlist.m3u', 'w', encoding='utf-8') as f:
             f.write(playlist)
-        print("Файл playlist.m3u успешно перезаписан.")
     else:
-        print("Плейлист не создан, так как ни одной ссылки не перехвачено.")
+        # Специально создаем пустой маркер ошибки для логов GitHub
+        with open('error_marker.txt', 'w') as f:
+            f.write('No links found')
 
 if __name__ == "__main__":
     main()
