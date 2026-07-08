@@ -1,9 +1,9 @@
 name: Auto Update IPTV
 
 on:
+  workflow_dispatch:
   schedule:
-    - cron: '0 */6 * * *' # Запуск каждые 6 часов
-  workflow_dispatch: # Позволяет запускать вручную кнопкой
+    - cron: '0 */6 * * *'
 
 jobs:
   run-browser-parser:
@@ -12,7 +12,7 @@ jobs:
       contents: write
 
     steps:
-    - name: Скачиваем файлы репозитория
+    - name: Скачиваем файлы
       uses: actions/checkout@v4
 
     - name: Включаем Python
@@ -20,19 +20,30 @@ jobs:
       with:
         python-version: '3.10'
 
-    - name: Устанавливаем библиотеки и браузер
+    - name: Устанавливаем библиотеки
       run: |
         pip install playwright
         playwright install chromium --with-deps
 
-    - name: Запускаем виртуальный кликер
+    - name: Запускаем кликер
       run: python parser.py
 
-    - name: Сохраняем обновленный плейлист на GitHub
+    - name: Проверяем результат и сохраняем
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add playlist.m3u
-        git commit -m "Плейлист автоматически обновлен" || exit 0
-        git push
+        if [ -f playlist.m3u ]; then
+          git add playlist.m3u
+          git commit -m "Обновление плейлиста"
+          git push
+        else
+          echo "Файл плейлиста не найден!"
+        fi
+
+    - name: Загружаем скриншот ошибки (если он есть)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: screen-drop
+        path: error_screen.png
 
