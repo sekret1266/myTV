@@ -3,7 +3,8 @@
     "name": "Первый канал",
     "tvg_id": "pervy",
     "logo": "https://epg.iptvx.one/picons/pervy.png",
-    "https://smotrettv.net/tv/public/1003-pervyj-kanal.html": "https://site.com/page-with-m3u8-first"
+    "source_url": "https://smotrettv.net/tv/public/1003-pervyj-kanal.html"
   }
 ]
+
 
