@@ -46,4 +46,11 @@ jobs:
       with:
         name: screen-drop
         path: error_screen.png
+        - name: Commit and Push changes
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add playlist.m3u
+        git commit -m "Auto-update playlist" || echo "No changes to commit"
+        git push
 
