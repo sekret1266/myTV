@@ -3,7 +3,7 @@ import time
 from playwright.sync_api import sync_playwright
 
 # Вставь сюда свою ссылку на телепрограмму, если она есть
-EPG_URL = "https://example.com/epg.xml.gz"
+EPG_URL = "https://iptvx.one/EPG_NOARCH"
 
 def get_m3u8_with_click(url):
     m3u8_link = None
