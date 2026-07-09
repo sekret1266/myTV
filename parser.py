@@ -1,6 +1,6 @@
 import json
 from playwright.sync_api import sync_playwright
-from playwright_stealth import stealth_sync
+from playwright_stealth import stealth  # Исправили импорт здесь
 
 def get_direct_link(url):
     try:
@@ -16,8 +16,8 @@ def get_direct_link(url):
             )
             page = context.new_page()
             
-            # Активируем маскировку под реального человека
-            stealth_sync(page)
+            # Активируем маскировку под реального человека (исправили вызов функции)
+            stealth(page)
             
             def handle_request(request):
                 req_url = request.url
