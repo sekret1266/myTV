@@ -44,7 +44,7 @@ jobs:
 
       - name: Загружаем скриншот ошибки (если он есть)
         if: failure()
-        uses: actions/artifacts@v4
+        uses: actions/upload-artifact@v4
         with:
           name: screen-drop
           path: error_screen.png
