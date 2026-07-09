@@ -1,3 +1,3 @@
-#EXTM3U x-tvg-url="(EPG_URL)"
+#EXTM3U
 #EXTINF:-1 tvg-id="pervy" tvg-logo="https://epg.iptvx.one/picons/pervy.png",Первый канал
-https://edge02d.mediavitrina.ru/hls-livef6/1tv/tracks-v4a1/mono.m3u8?token=v2.mfmVwpNJxNiysIhqL8SyTqoR3dkhyKhQhk-Vnon-5Nc.oV0M__XexffcsjV3e2z-EFeUoBcTkyzivWytvYbF45c.1784198753.25a10bb27264398539306c1daf2ab3dd
+https://edge02d.mediavitrina.ru/hls-livef6/1tv/tracks-v4a1/mono.m3u8?token=v2.frhRDu9NZVjk9Pz4Af_RIPgC84tm-SWXQp5ShvNVa3I.szgOzlhkSlf2Me0gBea8rxd8d5y7F-0zXi7wdZ2JROM.1784199666.d839388481a74c82acbd49a807cf4d0f
