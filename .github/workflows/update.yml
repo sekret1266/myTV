@@ -1,3 +1,5 @@
+
+
 name: Auto Update IPTV
 
 on:
@@ -30,11 +32,11 @@ jobs:
 
     - name: Проверяем результат и сохраняем
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
         if [ -f playlist.m3u ]; then
           git add playlist.m3u
-          git commit -m "Обновление плейлиста"
+          git commit -m "Auto-update playlist" || echo "No changes to commit"
           git push
         else
           echo "Файл плейлиста не найден!"
@@ -46,11 +48,3 @@ jobs:
       with:
         name: screen-drop
         path: error_screen.png
-        - name: Commit and Push changes
-      run: |
-        git config --local user.email "github-actions[bot]@users.noreply.github.com"
-        git config --local user.name "github-actions[bot]"
-        git add playlist.m3u
-        git commit -m "Auto-update playlist" || echo "No changes to commit"
-        git push
-
