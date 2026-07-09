@@ -8,6 +8,7 @@ def get_direct_link(url):
         found_links = []
 
         with sync_playwright() as p:
+            # Запускаем браузер с эмуляцией реального экрана
             browser = p.chromium.launch(headless=True)
             context = browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -15,33 +16,43 @@ def get_direct_link(url):
             )
             
             page = context.new_page()
-            # Маскировка: убираем след автоматизации Playwright
+            # Убираем след автоматизации Playwright
             page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
-            # Функция-перехватчик сетевых запросов
+            # Расширенный перехват: ловим запросы со всей страницы (включая iframe)
             def handle_request(request):
                 req_url = request.url
-                if ".m3u8" in req_url and "req_url" and "google" not in req_url and "yandex" not in req_url:
-                    found_links.append(req_url)
+                # Ищем файлы плейлистов (.m3u8 или .mpd), игнорируя рекламу и метрики
+                if (".m3u8" in req_url or ".mpd" in req_url) and "google" not in req_url and "yandex" not in req_url:
+                    if req_url not in found_links:
+                        found_links.append(req_url)
 
             page.on("request", handle_request)
 
-            # Ждем загрузку DOM структуры страницы
-            page.goto(url, timeout=45000, wait_until="domcontentloaded")
-
-            # Даем плееру время подумать и прогрузиться
+            # Переходим на сайт и ждем полной загрузки сети
+            page.goto(url, timeout=60000, wait_until="networkidle")
             page.wait_for_timeout(3000)
 
-            # Пытаемся кликнуть по плееру/видео, чтобы активировать поток
+            # --- ЭМУЛЯЦИЯ КЛИКА ПО ПЛЕЕРУ ---
             try:
-                page.click("video", timeout=5000)
-            except Exception:
-                pass
+                # Кликаем мышкой точно по центру экрана (где находится плеер)
+                page.mouse.click(640, 360)
+                print("Сделан клик мышью по центру экрана для запуска плеера...")
+            except Exception as click_err:
+                print(f"Не удалось кликнуть по координатам: {click_err}")
 
-            # Даем еще 7 секунд, чтобы поймать вылетающие ссылки
-            page.wait_for_timeout(7000)
+            # На всякий случай кликаем по тегам элементов
+            for selector in ["video", "div[class*='player']", "div[id*='player']", "iframe"]:
+                try:
+                    if page.locator(selector).count() > 0:
+                        page.locator(selector).first.click(timeout=2000)
+                except Exception:
+                    pass
 
-            # Если ссылки так и не появились — делаем скриншот внутри блока try
+            # Даем 10 секунд при запущенном плеере, чтобы поймать ссылку на поток
+            page.wait_for_timeout(10000)
+
+            # Если ссылки нет — делаем свежий скриншот
             if not found_links:
                 print("Ссылка не найдена, сохраняем скриншот...")
                 page.screenshot(path="error_screen.png", full_page=True)
@@ -54,7 +65,6 @@ def get_direct_link(url):
 
     except Exception as e:
         print(f"Ошибка при перехвате трафика: {e}")
-        # На случай непредвиденной ошибки пытаемся сделать скриншот перед выходом
         try:
             with sync_playwright() as p:
                 browser = p.chromium.launch(headless=True)
