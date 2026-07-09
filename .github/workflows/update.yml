@@ -22,7 +22,7 @@ jobs:
 
       - name: Устанавливаем библиотеки
         run: |
-          pip install playwright
+          pip install playwright playwright-stealth
           playwright install chromium --with-deps
 
       - name: Запускаем кликер
@@ -47,5 +47,8 @@ jobs:
         with:
           name: screen-drop
           path: error_screen.png
+
+
+
 
 
