@@ -22,13 +22,14 @@ jobs:
 
       - name: Устанавливаем библиотеки
         run: |
-          pip install playwright playwright-stealth
+          pip install playwright
           playwright install chromium --with-deps
 
       - name: Запускаем кликер
         run: python parser.py
 
       - name: Проверяем результат и сохраняем
+        if: success()
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
@@ -37,18 +38,13 @@ jobs:
             git commit -m "Auto-update playlist" || echo "No changes to commit"
             git push
           else
-            echo "Файл плейлиста не найден!"
+            echo "Файл плейлиста физически отсутствует!"
             exit 1
           fi
 
       - name: Загружаем скриншот ошибки (если он есть)
-        if: always()
-        uses: actions/upload-artifact@v4
+        if: failure()
+        uses: actions/artifacts@v4
         with:
           name: screen-drop
           path: error_screen.png
-
-
-
-
-
