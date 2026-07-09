@@ -6,36 +6,46 @@ EPG_URL = "https://example.com/epg.xml.gz"
 
 def get_direct_link(url):
     try:
-        print(f"Сканируем страницу через Playwright: {url}")
+        print(f"Сканируем страницу и ловим сетевые запросы: {url}")
+        found_links = []
+
         with sync_playwright() as p:
-            # Запускаем браузер в фоновом режиме
             browser = p.chromium.launch(headless=True)
             context = browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             )
             page = context.new_page()
-            
-            # Переходим на сайт и ждем полной загрузки контента
+
+            # Функция-перехватчик: проверяет каждый фоновый запрос сайта
+            def handle_request(request):
+                req_url = request.url
+                # Если в запросе проскочил стрим .m3u8 и это не реклама/аналитика
+                if ".m3u8" in req_url and "google" not in req_url and "yandex" not in req_url:
+                    found_links.append(req_url)
+
+            # Включаем «прослушку» сети
+            page.on("request", handle_request)
+
+            # Открываем сайт канала
             page.goto(url, timeout=30000, wait_until="networkidle")
-            html = page.content()
+            
+            # Имитируем клик по плееру, чтобы стрим начал подгружаться в сеть
+            try:
+                page.click("video", timeout=3000)
+            except Exception:
+                pass
+
+            # Даем плееру 5 секунд, чтобы он успел отправить запрос к трансляции
+            page.wait_for_timeout(5000)
             browser.close()
 
-        # Ищем любые ссылки, заканчивающиеся на .m3u8 внутри кода страницы
-        links = re.findall(r'(https?://[^\s"\'>]+?\.m3u8[^\s"\'>]*)', html)
-        
-        # Если нашли, убираем мусорные ссылки (метрики, яндекс и т.д.)
-        for link in links:
-            clean_link = link.replace('\\', '')
-            if "google" not in clean_link and "yandex" not in clean_link:
-                return clean_link
-
-        # Хитрый поиск: ищем ссылки на потоки в плеере clappr / hls
-        match = re.search(r'source:\s*[\'"](https?://[^\'"]+)[\'"]', html)
-        if match:
-            return match.group(1)
+        if found_links:
+            # Очищаем ссылку от возможных экранирующих символов и возвращаем её
+            clean_link = found_links[0].replace('\\', '')
+            return clean_link
 
     except Exception as e:
-        print(f"Ошибка при чтении страницы: {e}")
+        print(f"Ошибка при перехвате трафика: {e}")
     return None
 
 def main():
@@ -50,7 +60,7 @@ def main():
         live_link = get_direct_link(ch['source_url'])
 
         if live_link:
-            print("УСПЕХ! Ссылка найдена!")
+            print("УСПЕХ! Прямая ссылка найдена!")
             playlist += f'#EXTINF:-1 tvg-id="{ch["tvg_id"]}" tvg-logo="{ch["logo"]}",{ch["name"]}\n'
             playlist += f'{live_link}\n'
             links_found += 1
@@ -60,7 +70,7 @@ def main():
     if links_found > 0:
         with open('playlist.m3u', 'w', encoding='utf-8') as f:
             f.write(playlist)
-        print("Файл playlist.m3u успешно сохранен.")
+        print("Файл playlist.m3u успешно сохранен и обновлен.")
     else:
         print("Ссылки не найдены, файл не перезаписан.")
 
