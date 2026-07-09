@@ -1,5 +1,3 @@
-
-
 name: Auto Update IPTV
 
 on:
@@ -14,37 +12,40 @@ jobs:
       contents: write
 
     steps:
-    - name: Скачиваем файлы
-      uses: actions/checkout@v4
+      - name: Скачиваем файлы
+        uses: actions/checkout@v4
 
-    - name: Включаем Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
+      - name: Включаем Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
 
-    - name: Устанавливаем библиотеки
-      run: |
-        pip install playwright
-        playwright install chromium --with-deps
+      - name: Устанавливаем библиотеки
+        run: |
+          pip install playwright
+          playwright install chromium --with-deps
 
-    - name: Запускаем кликер
-      run: python parser.py
+      - name: Запускаем кликер
+        run: python parser.py
 
-    - name: Проверяем результат и сохраняем
-      run: |
-        git config --local user.email "github-actions[bot]@users.noreply.github.com"
-        git config --local user.name "github-actions[bot]"
-        if [ -f playlist.m3u ]; then
-          git add playlist.m3u
-          git commit -m "Auto-update playlist" || echo "No changes to commit"
-          git push
-        else
-          echo "Файл плейлиста не найден!"
-        fi
+      - name: Проверяем результат и сохраняем
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          if [ -f playlist.m3u ]; then
+            git add playlist.m3u
+            git commit -m "Auto-update playlist" || echo "No changes to commit"
+            git push
+          else
+            echo "Файл плейлиста не найден!"
+            exit 1
+          fi
 
-    - name: Загружаем скриншот ошибки (если он есть)
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: screen-drop
-        path: error_screen.png
+      - name: Загружаем скриншот ошибки (если он есть)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screen-drop
+          path: error_screen.png
+
+
