@@ -1,22 +1,21 @@
 import json
+import traceback
 from playwright.sync_api import sync_playwright
-from playwright_stealth import stealth  # Исправили импорт здесь
+from playwright_stealth import stealth
 
 def get_direct_link(url):
+    browser = None
     try:
         print(f"Сканируем страницу и ловим сетевые запросы: {url}")
         found_links = []
         
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            # Задаем фиксированное разрешение экрана
             context = browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
                 viewport={"width": 1280, "height": 720}
             )
             page = context.new_page()
-            
-            # Активируем маскировку под реального человека (исправили вызов функции)
             stealth(page)
             
             def handle_request(request):
@@ -26,23 +25,27 @@ def get_direct_link(url):
             
             page.on("request", handle_request)
             
-            # Открываем сайт
-            page.goto(url, timeout=30000, wait_until="domcontentloaded")
-            page.wait_for_timeout(3000) 
+            print("Открываем сайт...")
+            # Ставим таймаут поменьше и обрабатываем сбой загрузки страницы
+            try:
+                page.goto(url, timeout=20000, wait_until="load")
+            except Exception as e:
+                print(f"Предупреждение: Страница не загрузилась полностью: {e}")
             
-            # Кликаем точно в центр экрана, где находится плеер
+            page.wait_for_timeout(4000) 
+            
+            print("Пробуем кликнуть по координатам плеера...")
             try:
                 page.mouse.click(640, 360)
-                print("Сделали клик по координатам плеера")
+                print("Клик выполнен успешно.")
             except Exception as e:
                 print(f"Не удалось кликнуть: {e}")
             
-            # Ждем 7 секунд, пока поток подгрузится
-            page.wait_for_timeout(7000)
+            page.wait_for_timeout(6000)
             
-            if not found_links:
-                print("Ссылка не найдена, сохраняем скриншот...")
-                page.screenshot(path="error_screen.png", full_page=True)
+            # Делаем скриншот в любом случае для диагностики
+            print("Сохраняем скриншот экрана...")
+            page.screenshot(path="error_screen.png", full_page=True)
             
             browser.close()
             
@@ -51,7 +54,13 @@ def get_direct_link(url):
             return clean_link
             
     except Exception as e:
-        print(f"Ошибка при перехвате трафика: {e}")
+        print(f"Критическая ошибка внутри get_direct_link: {e}")
+        traceback.print_exc()
+        if browser:
+            try:
+                browser.close()
+            except:
+                pass
     return None
 
 def main():
