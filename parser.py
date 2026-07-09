@@ -3,12 +3,13 @@ import sys
 from playwright.sync_api import sync_playwright
 
 def get_direct_link(url):
+    page = None
+    browser = None
     try:
         print(f"Сканируем страницу и ловим сетевые запросы: {url}")
         found_links = []
 
         with sync_playwright() as p:
-            # Запускаем браузер с эмуляцией реального экрана
             browser = p.chromium.launch(headless=True)
             context = browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -19,40 +20,48 @@ def get_direct_link(url):
             # Убираем след автоматизации Playwright
             page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
-            # Расширенный перехват: ловим запросы со всей страницы (включая iframe)
+            # Перехватчик сетевых запросов
             def handle_request(request):
                 req_url = request.url
-                # Ищем файлы плейлистов (.m3u8 или .mpd), игнорируя рекламу и метрики
                 if (".m3u8" in req_url or ".mpd" in req_url) and "google" not in req_url and "yandex" not in req_url:
                     if req_url not in found_links:
                         found_links.append(req_url)
 
             page.on("request", handle_request)
 
-            # Переходим на сайт и ждем полной загрузки сети
-            page.goto(url, timeout=60000, wait_until="networkidle")
-            page.wait_for_timeout(3000)
+            # Используем domcontentloaded, чтобы не зависать на бесконечной рекламе
+            page.goto(url, timeout=45000, wait_until="domcontentloaded")
+            
+            # Даем сайту 5 секунд чисто «подышать» и прогрузить плеер на уровне JS
+            page.wait_for_timeout(5000)
 
-            # --- ЭМУЛЯЦИЯ КЛИКА ПО ПЛЕЕРУ ---
+            # --- ТОЧНЫЙ КЛИК ПО ПЛЕЕРУ ---
             try:
-                # Кликаем мышкой точно по центру экрана (где находится плеер)
-                page.mouse.click(640, 360)
-                print("Сделан клик мышью по центру экрана для запуска плеера...")
+                video_element = page.locator("video").first
+                if video_element.is_visible():
+                    video_element.click(timeout=5000)
+                    print("УСПЕХ: Кликнули точно по элементу <video>.")
+                else:
+                    player_container = page.locator("div[id*='player'], div[class*='player'], #video-player, .player").first
+                    if player_container.is_visible():
+                        player_container.click(timeout=5000)
+                        print("Элемент video скрыт, кликнули по контейнеру плеера.")
+                    else:
+                        # Запасной клик по координатам плеера (он обычно в левой верхней части контента)
+                        page.mouse.click(450, 320)
+                        print("Плеер не найден по селекторам, сделан клик по координатам плеера (450, 320)")
             except Exception as click_err:
-                print(f"Не удалось кликнуть по координатам: {click_err}")
-
-            # На всякий случай кликаем по тегам элементов
-            for selector in ["video", "div[class*='player']", "div[id*='player']", "iframe"]:
+                print(f"Ошибка при попытке кликнуть: {click_err}")
+                # Самый последний шанс — кликнуть в стандартный центр плеера
                 try:
-                    if page.locator(selector).count() > 0:
-                        page.locator(selector).first.click(timeout=2000)
-                except Exception:
+                    page.mouse.click(640, 360)
+                except:
                     pass
 
-            # Даем 10 секунд при запущенном плеере, чтобы поймать ссылку на поток
+            # Ждем 10 секунд, пока поток начнет воспроизводиться и мы поймаем ссылку
             page.wait_for_timeout(10000)
 
-            # Если ссылки нет — делаем свежий скриншот
+            # Если ссылки нет — сохраняем скриншот для отладки
             if not found_links:
                 print("Ссылка не найдена, сохраняем скриншот...")
                 page.screenshot(path="error_screen.png", full_page=True)
@@ -65,14 +74,16 @@ def get_direct_link(url):
 
     except Exception as e:
         print(f"Ошибка при перехвате трафика: {e}")
+        # Если что-то упало внутри, аварийно пытаемся сохранить скриншот экрана
         try:
-            with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True)
-                page = browser.new_page()
-                page.goto(url)
+            if page:
                 page.screenshot(path="error_screen.png", full_page=True)
+        except:
+            pass
+        try:
+            if browser:
                 browser.close()
-        except Exception:
+        except:
             pass
             
     return None
@@ -102,7 +113,6 @@ def main():
         print("Файл playlist.m3u успешно сохранен и обновлен.")
     else:
         print("Ссылки не найдены, файл не перезаписан.")
-        # Завершаем работу с кодом 1, чтобы GitHub Actions понял, что произошла ошибка
         sys.exit(1)
 
 if __name__ == "__main__":
