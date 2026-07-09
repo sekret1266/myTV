@@ -16,31 +16,32 @@ def get_direct_link(url):
             )
             page = context.new_page()
 
-            # Функция-перехватчик: проверяет каждый фоновый запрос сайта
+            # Функция-перехватчик сетевых запросов
             def handle_request(request):
                 req_url = request.url
-                # Если в запросе проскочил стрим .m3u8 и это не реклама/аналитика
                 if ".m3u8" in req_url and "google" not in req_url and "yandex" not in req_url:
                     found_links.append(req_url)
 
-            # Включаем «прослушку» сети
             page.on("request", handle_request)
-
-            # Открываем сайт канала
             page.goto(url, timeout=30000, wait_until="networkidle")
             
-            # Имитируем клик по плееру, чтобы стрим начал подгружаться в сеть
             try:
                 page.click("video", timeout=3000)
             except Exception:
                 pass
 
-            # Даем плееру 5 секунд, чтобы он успел отправить запрос к трансляции
             page.wait_for_timeout(5000)
+
+            # --- ВОТ ЭТОТ НОВЫЙ БЛОК ---
+            # Если ссылки в сети не нашлись, делаем скриншот плеера перед закрытием браузера
+            if not found_links:
+                print("Ссылка не найдена, делаем скриншот страницы для отладки...")
+                page.screenshot(path="error_screen.png", full_page=True)
+            # ---------------------------
+
             browser.close()
 
         if found_links:
-            # Очищаем ссылку от возможных экранирующих символов и возвращаем её
             clean_link = found_links[0].replace('\\', '')
             return clean_link
 
