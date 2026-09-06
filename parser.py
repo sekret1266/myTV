@@ -4,7 +4,6 @@ import sys
 from playwright.sync_api import sync_playwright
 
 def run_parser():
-    # Загрузка списка каналов из файла channels.json
     try:
         with open('channels.json', 'r', encoding='utf-8') as f:
             channels = json.load(f)
@@ -12,7 +11,6 @@ def run_parser():
         print(f"[ОШИБКА] Не удалось прочитать channels.json: {e}")
         return
 
-    # Исправленный адрес сайта (drm-play.com)
     target_url = "http://ott.drm-play.com"
     captured_streams = []
 
@@ -25,7 +23,6 @@ def run_parser():
         )
         page = context.new_page()
 
-        # Функция перехвата сетевых запросов
         def handle_request(request):
             req_url = request.url
             if (".m3u8" in req_url or ".mpd" in req_url) and "google" not in req_url and "yandex" not in req_url:
@@ -36,36 +33,32 @@ def run_parser():
         page.on("request", handle_request)
 
         print(f"Открываем страницу {target_url}...")
-        page.goto(target_url, timeout=45000, wait_until="domcontentloaded")
-        page.wait_for_timeout(4000)
+        page.goto(target_url, timeout=60000, wait_until="networkidle")
+        page.wait_for_timeout(5000)
 
-        # Закрытие модального окна "Подтверждение Ссылок" (кнопка Продолжить)
+        # Закрываем модальное окно с предупреждением
         try:
-            confirm_btn = page.locator("text='Продолжить'")
-            if confirm_btn.is_visible():
-                confirm_btn.click()
-                print("Закрыто стартовое предупреждение.")
-                page.wait_for_timeout(2000)
+            page.keyboard.press("Enter")
+            page.wait_for_timeout(2000)
         except Exception:
             pass
 
-        print("Активируем интерфейс (клик по центру)...")
-        page.mouse.click(640, 360)
-        page.wait_for_timeout(2000)
-
         results = []
 
-        # Цикл прохода по каналам из channels.json
+        # Ждем загрузки списка элементов
+        page.wait_for_timeout(3000)
+
         for index, ch in enumerate(channels):
             print(f"Переключение на канал #{index + 1}: {ch['name']}")
-            if index > 0:
-                page.keyboard.press("ArrowDown")
-                page.wait_for_timeout(500)
-
             start_count = len(captured_streams)
+
+            # Переключаем каналы через виртуальную клавиатуру/стрелки с гарантированной паузой
+            page.keyboard.press("ArrowDown")
+            page.wait_for_timeout(1000)
             page.keyboard.press("Enter")
 
-            for _ in range(10):
+            # Ожидаем появления нового потока до 8 секунд
+            for _ in range(16):
                 if len(captured_streams) > start_count:
                     break
                 page.wait_for_timeout(500)
@@ -84,7 +77,6 @@ def run_parser():
 
         browser.close()
 
-    # Формирование итогового плейлиста M3U
     if results:
         playlist_content = '#EXTM3U url-tvg="https://epg.iptvx.one/epg.xml.gz"\n'
         for item in results:
