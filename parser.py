@@ -12,7 +12,7 @@ def run_parser():
         return
 
     target_url = "http://ott.drm-play.com"
-    captured_streams = set()
+    captured_streams = []
 
     with sync_playwright() as p:
         print("Запуск браузера Chromium...")
@@ -26,42 +26,29 @@ def run_parser():
         )
         page = context.new_page()
 
-        # Глобальный перехватчик любых потоков (.m3u8 или .mpd) во время работы страницы
         def handle_request(request):
             req_url = request.url
-            if any(ext in req_url for ext in [".m3u8", ".mpd", "playlist", "stream"]):
-                if "google" not in req_url and "yandex" not in req_url and req_url not in captured_streams:
-                    print(f"[+] Найден поток: {req_url[:80]}...")
-                    captured_streams.add(req_url)
+            # Строгий фильтр: ищем только реальные потоки m3u8/mpd, исключая статику и GitHub
+            if any(ext in req_url for ext in [".m3u8", ".mpd"]) and "github" not in req_url and "ipetv" not in req_url:
+                if req_url not in captured_streams:
+                    print(f"[+] Найден видеопоток: {req_url[:80]}...")
+                    captured_streams.append(req_url)
 
         page.on("request", handle_request)
 
         print(f"Открываем страницу {target_url}...")
         page.goto(target_url, timeout=60000, wait_until="networkidle")
         
-        # Даем время плееру прогрузить плейлист и фоновые потоки
-        print("Ожидание инициализации потоков плеера...")
-        page.wait_for_timeout(10000)
-
-        # Кликаем по центру для активации контента
+        # Ожидание загрузки плеера
+        page.wait_for_timeout(8000)
         page.mouse.click(640, 360)
         page.wait_for_timeout(5000)
 
         browser.close()
 
-    # Собираем уникальные потоки
-    streams_list = list(captured_streams)
-    print(f"Всего перехвачено уникальных потоков: {len(streams_list)}")
-
     results = []
-    # Сопоставляем каналы из channels.json с найденными потоками
     for index, ch in enumerate(channels):
-        stream_url = ""
-        if index < len(streams_list):
-            stream_url = streams_list[index]
-        elif streams_list:
-            stream_url = streams_list[0] # Запасной вариант, если потоков меньше чем каналов
-
+        stream_url = captured_streams[index] if index < len(captured_streams) else (captured_streams[0] if captured_streams else "")
         results.append({
             "name": ch["name"],
             "tvg_id": ch.get("tvg_id", ""),
@@ -70,7 +57,6 @@ def run_parser():
             "url": stream_url
         })
 
-    # Формирование итогового плейлиста M3U
     if results:
         playlist_content = '#EXTM3U url-tvg="https://epg.iptvx.one/epg.xml.gz"\n'
         for item in results:
