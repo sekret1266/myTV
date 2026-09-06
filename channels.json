@@ -1,10 +1,81 @@
 [
   {
-    "name": "Первый канал",
+    "name": "Первый канал HD",
     "tvg_id": "pervy",
-    "logo": "https://epg.iptvx.one/picons/pervy.png",
-    "source_url": "https://smotrettv.net/tv/public/1003-pervyj-kanal.html"
+    "group": "Общественные",
+    "logo": "https://iptvx.one/picons/pervy.png"
+  },
+  {
+    "name": "Россия 1 HD",
+    "tvg_id": "rossia1",
+    "group": "Общественные",
+    "logo": "https://iptvx.one/picons/rossia1.png"
+  },
+  {
+    "name": "НТВ HD",
+    "tvg_id": "ntv",
+    "group": "Общественные",
+    "logo": "https://iptvx.one/picons/ntv.png"
+  },
+  {
+    "name": "ОТР",
+    "tvg_id": "otr",
+    "group": "Общественные",
+    "logo": "https://iptvx.one/picons/otr.png"
+  },
+  {
+    "name": "Пятый канал",
+    "tvg_id": "5kanal-ru",
+    "group": "Общественные",
+    "logo": "https://iptvx.one/picons/5kanal-ru.png"
+  },
+  {
+    "name": "ТВ Центр",
+    "tvg_id": "tvcentr",
+    "group": "Общественные",
+    "logo": "https://iptvx.one/picons/tvcentr.png"
+  },
+  {
+    "name": "Рен ТВ",
+    "tvg_id": "rentv",
+    "group": "Общественные",
+    "logo": "https://iptvx.one/picons/18.png"
+  },
+  {
+    "name": "ТВ3",
+    "tvg_id": "tv3-ru",
+    "group": "Общественные",
+    "logo": "https://iptvx.one/picons/tv3-ru.png"
+  },
+  {
+    "name": "Звезда HD",
+    "tvg_id": "zvezda",
+    "group": "Общественные",
+    "logo": "https://iptvx.one/picons/zvezda.png"
+  },
+  {
+    "name": "Мир",
+    "tvg_id": "mir",
+    "group": "Общественные",
+    "logo": "https://iptvx.one/picons/mir.png"
+  },
+  {
+    "name": "Время",
+    "tvg_id": "vremia",
+    "group": "Общественные",
+    "logo": "https://iptvx.one/picons/vremia.png"
+  },
+  {
+    "name": "Известия HD",
+    "tvg_id": "izvestia",
+    "group": "Информационные",
+    "logo": "https://iptvx.one/picons/izvestia.png"
+  },
+  {
+    "name": "Мир 24 HD",
+    "tvg_id": "mir-24",
+    "group": "Информационные",
+    "logo": "https://iptvx.one/picons/mir24.png"
   }
 ]
-
 
