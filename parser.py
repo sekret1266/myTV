@@ -10,7 +10,7 @@ def run_parser():
         return
 
     target_url = "http://ott.drm-play.com"
-    results = []
+    captured_streams = []
 
     with sync_playwright() as p:
         print("Запуск браузера...")
@@ -26,70 +26,53 @@ def run_parser():
         
         page = context.new_page()
 
+        # Глобальный перехватчик сетевых запросов
+        def handle_request(request):
+            url = request.url
+            if any(ext in url for ext in ['.m3u8', '.mpd', 'stream', 'playlist']) and 'google' not in url:
+                if url not in captured_streams:
+                    print(f"[+] Найден поток: {url}")
+                    captured_streams.append(url)
+
+        page.on("request", handle_request)
+
         print(f"Открываем {target_url}...")
         try:
-            page.goto(target_url, timeout=60000, wait_until="domcontentloaded")
+            page.goto(target_url, timeout=30000, wait_until="domcontentloaded")
         except Exception as e:
             print(f"[ОШИБКА] Не удалось открыть страницу: {e}")
             browser.close()
             return
 
-        page.wait_for_timeout(5000)
+        page.wait_for_timeout(3000)
 
-        # Проходим по каждому каналу из нашего списка
+        # Безопасный перебор каналов стрелками без зависаний
         for index, ch in enumerate(channels):
-            channel_name = ch['name']
-            print(f"Обработка канала: {channel_name}")
-            
-            captured_stream = None
-
-            # Перехватываем запрос, который уходит при клике на конкретный канал
-            def handle_request(request):
-                nonlocal captured_stream
-                url = request.url
-                if any(ext in url for ext in ['.m3u8', '.mpd', 'stream']) and 'google' not in url:
-                    captured_stream = url
-
-            # Включаем прослушку сети на момент клика
-            page.on("request", handle_request)
-
+            print(f"Обработка канала: {ch['name']}")
             try:
-                # Пытаемся найти элемент канала на странице по названию или тексту и кликнуть по нему
-                # Если сайт использует другую верстку, здесь может понадобиться точный селектор
-                channel_element = page.locator(f"text={channel_name}").first
-                if channel_element.count() > 0:
-                    channel_element.click()
-                else:
-                    # Запасной вариант: клик по координатам или навигация стрелками, если текст не найден
+                if index > 0:
                     page.keyboard.press("ArrowDown")
-                    page.keyboard.press("Enter")
+                    page.wait_for_timeout(800)
                 
-                # Ждем, пока пойдет сетевой запрос потока
-                page.wait_for_timeout(3000)
-            except Exception as e:
-                print(f"[!] Ошибка при клике на канал {channel_name}: {e}")
-
-            # Отключаем обработчик, чтобы не перепутать потоки
-            page.remove_listener("request", handle_request)
-
-            if captured_stream:
-                print(f"[+] Пойман поток для {channel_name}: {captured_stream}")
-            else:
-                print(f"[-] Не удалось поймать поток для {channel_name}")
-                captured_stream = ""
-
-            results.append({
-                "name": channel_name,
-                "tvg_id": ch.get("tvg_id", ""),
-                "group": ch.get("group", "Общественные"),
-                "logo": ch.get("logo", ""),
-                "url": captured_stream
-            })
+                page.keyboard.press("Enter")
+                page.wait_for_timeout(2500) # Ожидание подгрузки потока
+            except Exception as ex:
+                print(f"[!] Ошибка при переключении: {ex}")
 
         browser.close()
 
-    valid_results = [r for r in results if r["url"]]
-    print(f"Всего успешно поймано потоков: {len(valid_results)} из {len(channels)}")
+    print(f"Всего поймано потоков: {len(captured_streams)}")
+
+    results = []
+    for index, ch in enumerate(channels):
+        stream_url = captured_streams[index] if index < len(captured_streams) else ""
+        results.append({
+            "name": ch["name"],
+            "tvg_id": ch.get("tvg_id", ""),
+            "group": ch.get("group", "Общественные"),
+            "logo": ch.get("logo", ""),
+            "url": stream_url
+        })
 
     if results:
         playlist_content = '#EXTM3U url-tvg="https://epg.iptvx.one/epg.xml.gz"\n'
@@ -105,3 +88,4 @@ def run_parser():
 
 if __name__ == "__main__":
     run_parser()
+
