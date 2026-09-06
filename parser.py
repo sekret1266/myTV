@@ -16,9 +16,12 @@ def run_parser():
 
     with sync_playwright() as p:
         print("Запуск браузера Chromium...")
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-setuid-sandbox", "--autoplay-policy=no-user-gesture-required"]
+        )
         context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            user_agent="Mozilla/5.0 (SmartTV; SmartTV; Linux/SmartTV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
             viewport={"width": 1280, "height": 720}
         )
         page = context.new_page()
@@ -33,32 +36,36 @@ def run_parser():
         page.on("request", handle_request)
 
         print(f"Открываем страницу {target_url}...")
-        page.goto(target_url, timeout=60000, wait_until="networkidle")
+        page.goto(target_url, timeout=60000, wait_until="domcontentloaded")
         page.wait_for_timeout(5000)
 
-        # Закрываем модальное окно с предупреждением
-        try:
-            page.keyboard.press("Enter")
-            page.wait_for_timeout(2000)
-        except Exception:
-            pass
+        # Проходим всплывающее окно "Подтверждение ссылок" (клик по кнопке "Продолжить")
+        print("Пробуем подтвердить диалоговое окно...")
+        page.mouse.click(420, 420)  # Левая кнопка "Продолжить"
+        page.wait_for_timeout(2000)
+        page.keyboard.press("Enter")
+        page.wait_for_timeout(3000)
+
+        # Клик по центру экрана для активации фокуса на списке
+        page.mouse.click(640, 360)
+        page.wait_for_timeout(2000)
+
+        # Сохраняем скриншот для проверки, что видит браузер
+        page.screenshot(path="error_screen.png")
 
         results = []
-
-        # Ждем загрузки списка элементов
-        page.wait_for_timeout(3000)
 
         for index, ch in enumerate(channels):
             print(f"Переключение на канал #{index + 1}: {ch['name']}")
             start_count = len(captured_streams)
 
-            # Переключаем каналы через виртуальную клавиатуру/стрелки с гарантированной паузой
-            page.keyboard.press("ArrowDown")
-            page.wait_for_timeout(1000)
+            if index > 0:
+                page.keyboard.press("ArrowDown")
+                page.wait_for_timeout(1000)
+
             page.keyboard.press("Enter")
 
-            # Ожидаем появления нового потока до 8 секунд
-            for _ in range(16):
+            for _ in range(15):
                 if len(captured_streams) > start_count:
                     break
                 page.wait_for_timeout(500)
