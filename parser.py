@@ -16,18 +16,21 @@ def run_parser():
         print("Запуск браузера...")
         browser = p.chromium.launch(
             headless=True,
-            args=["--no-sandbox", "--disable-setuid-sandbox", "--autoplay-policy=no-user-gesture-required"]
+            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
         )
+        
         context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             viewport={"width": 1280, "height": 720}
         )
+        
         page = context.new_page()
 
-        # Перехватчик сетевых запросов с фиксацией любых потоков
+        # Функция перехвата сетевых запросов
         def handle_request(request):
             url = request.url
-            if (".m3u8" in url or ".mpd" in url) and "google" not in url and "yandex" not in url:
+            # Ищем ссылки, похожие на потоки IPTV
+            if any(ext in url for ext in ['.m3u8', '.mpd', 'stream', 'playlist']) and 'google' not in url:
                 if url not in captured_streams:
                     print(f"[+] Найден поток: {url}")
                     captured_streams.append(url)
@@ -35,22 +38,38 @@ def run_parser():
         page.on("request", handle_request)
 
         print(f"Открываем {target_url}...")
-        page.goto(target_url, timeout=60000, wait_until="networkidle")
+        try:
+            page.goto(target_url, timeout=60000, wait_until="domcontentloaded")
+        except Exception as e:
+            print(f"[ОШИБКА] Не удалось открыть страницу: {e}")
+            browser.close()
+            return
+
+        # Ждем полной прогрузки элементов интерфейса
         page.wait_for_timeout(5000)
 
-        # Клик для активации интерфейса плеера
-        page.mouse.click(640, 360)
-        page.wait_for_timeout(3000)
+        # Клик по центру экрана для активации плеера/интерфейса
+        try:
+            page.mouse.click(640, 360)
+        except Exception:
+            pass
+            
+        page.wait_for_timeout(2000)
 
         # Проходим по списку каналов для вызова потоков
         for index, ch in enumerate(channels):
             print(f"Обработка канала: {ch['name']}")
+            
+            # Первый канал обычно уже выбран, для остальных нажимаем вниз
             if index > 0:
                 page.keyboard.press("ArrowDown")
-                page.wait_for_timeout(800)
-            
+                page.wait_for_timeout(1000)
+
+            # Нажимаем Enter для запуска канала
             page.keyboard.press("Enter")
-            page.wait_for_timeout(2000) # Ожидание подгрузки потока
+            
+            # Даем время плееру подгрузить поток и отправить запрос в сеть
+            page.wait_for_timeout(3500)
 
         browser.close()
 
@@ -58,8 +77,8 @@ def run_parser():
 
     results = []
     for index, ch in enumerate(channels):
-        # Подставляем пойманный поток или оставляем заглушку, если поток не найден
-        stream_url = captured_streams[index] if index < len(captured_streams) else (captured_streams[0] if captured_streams else "http://invalid.link/stream.m3u8")
+        # Подставляем пойманный поток по порядку, если он есть
+        stream_url = captured_streams[index] if index < len(captured_streams) else ""
         results.append({
             "name": ch["name"],
             "tvg_id": ch.get("tvg_id", ""),
@@ -71,10 +90,10 @@ def run_parser():
     if results:
         playlist_content = '#EXTM3U url-tvg="https://epg.iptvx.one/epg.xml.gz"\n'
         for item in results:
-            playlist_content += f'#EXTINF:-1 tvg-id="{item["tvg_id"]}" tvg-logo="{item["logo"]}" group-title="{item["group"]}",{item["name"]}\n'
+            playlist_content += f'#EXTINF:-1 tvg-id="{item["tvg_id"]}" group-title="{item["group"]}" tvg-logo="{item["logo"]}",{item["name"]}\n'
             playlist_content += f'{item["url"]}\n'
 
-        with open("playlist.m3u", "w", encoding="utf-8") as f:
+        with open('playlist.m3u', 'w', encoding='utf-8') as f:
             f.write(playlist_content)
         print(f"[УСПЕХ] Плейлист обновлен, каналов: {len(results)}")
     else:
@@ -82,4 +101,5 @@ def run_parser():
 
 if __name__ == "__main__":
     run_parser()
+
 
