@@ -12,7 +12,8 @@ def run_parser():
         print(f"[ОШИБКА] Не удалось прочитать channels.json: {e}")
         return
 
-    target_url = "http://ott.dre-play.com"
+    # Исправленный адрес сайта (drm-play.com)
+    target_url = "http://ott.drm-play.com"
     captured_streams = []
 
     with sync_playwright() as p:
@@ -38,7 +39,7 @@ def run_parser():
         page.goto(target_url, timeout=45000, wait_until="domcontentloaded")
         page.wait_for_timeout(4000)
 
-        # Закрытие модальных окон при наличии
+        # Закрытие модального окна "Подтверждение Ссылок" (кнопка Продолжить)
         try:
             confirm_btn = page.locator("text='Продолжить'")
             if confirm_btn.is_visible():
